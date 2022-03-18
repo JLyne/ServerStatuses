@@ -99,15 +99,12 @@ public class ServerStatuses {
 	}
 
 	private void pingServer(RegisteredServer server) {
-		logger.info("Pinging " + server.getServerInfo().getName() + "?");
 		if(!ongoingPings.contains(server)) {
-			logger.info("Pinging " + server.getServerInfo().getName() + "!");
-			logger.info("Pinging survival " + server.getServerInfo().getName());
 			ongoingPings.add(server);
 			server.ping().exceptionally((e) -> {
 				logger.warn("Pinging failed for " + server.getServerInfo().getName() + ": " + e.getMessage());
 				return null;
-			}).whenComplete((result, exception) -> {
+			}).whenCompleteAsync((result, exception) -> {
 				handlePingResponse(server, result);
 				ongoingPings.remove(server);
 			});
@@ -132,13 +129,11 @@ public class ServerStatuses {
 		}
 
 		serverStatuses.compute(server.getServerInfo().getName(), (String name, ServerStatus value) -> {
-			logger.info("handlePingResponse " + server.getServerInfo().getName() + "\n" + (value != null ? value.toString() : "null") + "\n" + status + "\n" + !status.equals(value));
 			changed.set(!status.equals(value));
 			return status;
 		});
 
 		if (changed.get()) {
-			logger.info("Sending status packet as " + server.getServerInfo().getName() + " has changed");
 			sendStatusPacket();
 		}
 	}
