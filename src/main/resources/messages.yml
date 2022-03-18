@@ -1,0 +1,13 @@
+statuses:
+  offline:
+    line-1: "<red>OFFLINE<reset> - <players>"
+    line-2: ""
+  online:
+    line-1: "<green>ONLINE<reset> - <players>"
+    line-2: "<motd>"
+  lockdown:
+    line-1: "<red>LOCKDOWN<reset> - <players>"
+    line-2: "<lockdownreason>"
+players:
+  online: "<online> playing"
+  queued: "<queued> queued"

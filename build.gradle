@@ -1,0 +1,46 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url "https://repo.not-null.co.uk/releases/" }
+    maven { url "https://papermc.io/repo/repository/maven-public/" }
+}
+
+dependencies {
+    compileOnly 'com.velocitypowered:velocity-api:3.1.2-SNAPSHOT'
+    compileOnly 'uk.co.notnull:ProxyQueuesAPI:1.2'
+
+    annotationProcessor 'com.velocitypowered:velocity-api:3.1.2-SNAPSHOT'
+}
+
+group = 'uk.co.notnull'
+version = '1.0-SNAPSHOT'
+
+java.sourceCompatibility = JavaVersion.VERSION_11
+java.targetCompatibility = JavaVersion.VERSION_11
+
+tasks {
+    processResources {
+        from("${project.rootDir}/src/main/resources") {
+            duplicatesStrategy = DuplicatesStrategy.INCLUDE
+            project.properties.findAll().each {
+                prop ->
+                    if (prop.value != null && prop.value instanceof java.lang.String) {
+                        filter(ReplaceTokens, tokens: [(prop.key): prop.value])
+                        filter(ReplaceTokens, tokens: [('project.' + prop.key): prop.value])
+                    }
+            }
+        }
+    }
+
+    compileJava {
+        options.compilerArgs += ["-Xlint:all", "-Xlint:-processing"]
+        options.encoding = 'UTF-8'
+    }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "serverstatuses",
+  "name": "ServerStatuses",
+  "version": "@project.version@",
+  "authors": ["Jim (NotKatuen)"],
+  "dependencies": [
+    {
+      "id": "proxyqueues",
+      "optional": true
+    }
+  ],
+  "main": "uk.co.notnull.serverstatuses.ServerStatuses"
+}
