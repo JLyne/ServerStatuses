@@ -16,6 +16,7 @@ import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import com.velocitypowered.api.proxy.server.ServerPing;
+import net.kyori.adventure.text.TextReplacementConfig;
 import ninja.leaping.configurate.ConfigurationNode;
 import ninja.leaping.configurate.yaml.YAMLConfigurationLoader;
 import org.slf4j.Logger;
@@ -48,6 +49,8 @@ public class ServerStatuses {
 
 	private final ConcurrentHashMap.KeySetView<RegisteredServer, Boolean> ongoingPings = ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<String, ServerStatus> serverStatuses = new ConcurrentHashMap<>();
+	private final TextReplacementConfig newlineRemoval = TextReplacementConfig.builder()
+			.match("\n").replacement("").build();
 
 	private boolean proxyQueuesEnabled = false;
 	private ProxyQueuesHandler proxyQueuesHandler;
@@ -125,7 +128,8 @@ public class ServerStatuses {
 			status = new ServerStatus(Status.OFFLINE, 0, queuedPlayers);
 		} else {
 			status = new ServerStatus(Status.ONLINE, response.getPlayers().map(ServerPing.Players::getOnline)
-					.orElse(0), queuedPlayers, response.getDescriptionComponent());
+					.orElse(0), queuedPlayers, response.getDescriptionComponent()
+					.replaceText(newlineRemoval));
 		}
 
 		serverStatuses.compute(server.getServerInfo().getName(), (String name, ServerStatus value) -> {
