@@ -18,7 +18,8 @@ public class ServerStatus {
 	private final int playersOnline;
 	private final int playersQueued;
 	private final String lockdownReason;
-	private final String[] lines = {"", ""};
+	private final String[] separateLines = {"", ""};
+	private String combinedLines = "";
 
 	private transient final Component motd;
 
@@ -63,11 +64,14 @@ public class ServerStatus {
 		}
 
 		String messageKey = status.getMessageKey();
+		Component line1 = Messages.getComponent(messageKey + ".line-1", placeholders, componentPlaceholders);
+		Component line2 = Messages.getComponent(messageKey + ".line-2", placeholders, componentPlaceholders);
 
-		lines[0] = gsonComponentSerializer.serialize(
-				Messages.getComponent(messageKey + ".line-1", placeholders, componentPlaceholders));
-		lines[1] = gsonComponentSerializer.serialize(
-				Messages.getComponent(messageKey + ".line-2", placeholders, componentPlaceholders));
+		separateLines[0] = gsonComponentSerializer.serialize(line1);
+		separateLines[1] = gsonComponentSerializer.serialize(line2);
+
+		combinedLines = gsonComponentSerializer.serialize(
+				Component.empty().append(line1).append(Component.newline()).append(line2));
 	}
 
 	public Status getStatus() {
@@ -94,8 +98,12 @@ public class ServerStatus {
 		return lockdownReason;
 	}
 
-	public String[] getLines() {
-		return lines;
+	public String[] getSeparateLines() {
+		return separateLines;
+	}
+
+	public String getCombinedLines() {
+		return combinedLines;
 	}
 
 	@Override

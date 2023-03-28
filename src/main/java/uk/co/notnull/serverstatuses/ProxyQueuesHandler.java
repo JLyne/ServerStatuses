@@ -7,9 +7,11 @@ import uk.co.notnull.proxyqueues.api.QueueType;
 import uk.co.notnull.proxyqueues.api.queues.ProxyQueue;
 
 public class ProxyQueuesHandler {
+	private final ServerStatuses plugin;
 	private final ProxyQueues proxyQueues;
 
-	public ProxyQueuesHandler(PluginContainer proxyQueues) {
+	public ProxyQueuesHandler(ServerStatuses plugin, PluginContainer proxyQueues) {
+		this.plugin = plugin;
 		this.proxyQueues = (ProxyQueues) proxyQueues.getInstance().get();
 	}
 
@@ -22,6 +24,36 @@ public class ProxyQueuesHandler {
 
 		return queue.getQueueSize(QueueType.NORMAL) + queue.getQueueSize(QueueType.PRIORITY)
 				+ queue.getQueueSize(QueueType.STAFF);
+	}
+
+	public boolean hasPause(RegisteredServer server) {
+		ProxyQueue queue = proxyQueues.getQueueHandler().getQueue(server);
+
+		if (queue == null) {
+			return false;
+		}
+
+		return queue.hasPause(plugin);
+	}
+
+	public void pause(RegisteredServer server) {
+		ProxyQueue queue = proxyQueues.getQueueHandler().getQueue(server);
+
+		if (queue == null) {
+			return;
+		}
+
+		queue.addPause(plugin, "Server is offline");
+	}
+
+	public void unpause(RegisteredServer server) {
+		ProxyQueue queue = proxyQueues.getQueueHandler().getQueue(server);
+
+		if (queue == null) {
+			return;
+		}
+
+		queue.removePause(plugin);
 	}
 }
 

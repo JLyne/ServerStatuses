@@ -49,6 +49,7 @@ public class ServerStatuses {
 
 	private final ConcurrentHashMap.KeySetView<RegisteredServer, Boolean> ongoingPings = ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<String, ServerStatus> serverStatuses = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<String, Integer> failedPings = new ConcurrentHashMap<>();
 	private final TextReplacementConfig newlineRemoval = TextReplacementConfig.builder()
 			.match("\n").replacement("").build();
 
@@ -76,7 +77,7 @@ public class ServerStatuses {
 		proxyQueuesEnabled = proxyQueues.isPresent();
 
 		if (proxyQueuesEnabled) {
-			this.proxyQueuesHandler = new ProxyQueuesHandler(proxyQueues.get());
+			this.proxyQueuesHandler = new ProxyQueuesHandler(this, proxyQueues.get());
 		}
 
 		proxy.getScheduler().buildTask(this, () -> {
@@ -116,7 +117,9 @@ public class ServerStatuses {
 
 	private void handlePingResponse(RegisteredServer server, ServerPing response) {
 		ServerStatus status;
+		String serverName = server.getServerInfo().getName();
 		AtomicBoolean changed = new AtomicBoolean(false);
+		int failed = 0;
 
 		if (!serversToPing.contains(server)) {
 			return;
@@ -132,13 +135,28 @@ public class ServerStatuses {
 					.replaceText(newlineRemoval));
 		}
 
-		serverStatuses.compute(server.getServerInfo().getName(), (String name, ServerStatus value) -> {
+		serverStatuses.compute(serverName, (String name, ServerStatus value) -> {
 			changed.set(!status.equals(value));
 			return status;
 		});
 
+		if(status.isOnline()) {
+			failed = failedPings.compute(serverName, (key, value) -> 0);
+		} else {
+			failed = failedPings.compute(serverName, (key, value) -> value == null ? 1 : value + 1);
+		}
+
 		if (changed.get()) {
 			sendStatusPacket();
+		}
+
+		// Pause a server's queue if it receives 3 failed pings in a row
+		if(proxyQueuesEnabled) {
+			if(!proxyQueuesHandler.hasPause(server) && failed >= 3) {
+				proxyQueuesHandler.pause(server);
+			} else if(failed == 0) {
+				proxyQueuesHandler.unpause(server);
+			}
 		}
 	}
 
