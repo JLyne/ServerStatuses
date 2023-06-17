@@ -2,21 +2,20 @@ import org.apache.tools.ant.filters.ReplaceTokens
 
 plugins {
     id 'java'
-    id 'maven-publish'
 }
 
 repositories {
     mavenLocal()
     mavenCentral()
-    maven { url "https://repo.not-null.co.uk/snapshots/" }
+    maven { url "https://repo.not-null.co.uk/releases/" }
     maven { url "https://papermc.io/repo/repository/maven-public/" }
 }
 
 dependencies {
-    compileOnly 'com.velocitypowered:velocity-api:3.1.2-SNAPSHOT'
-    compileOnly 'uk.co.notnull:ProxyQueuesAPI:1.4-SNAPSHOT'
+    compileOnly 'com.velocitypowered:velocity-api:3.2.0-SNAPSHOT'
+    compileOnly 'uk.co.notnull:ProxyQueuesAPI:1.4'
 
-    annotationProcessor 'com.velocitypowered:velocity-api:3.1.2-SNAPSHOT'
+    annotationProcessor 'com.velocitypowered:velocity-api:3.2.0-SNAPSHOT'
 }
 
 group = 'uk.co.notnull'
