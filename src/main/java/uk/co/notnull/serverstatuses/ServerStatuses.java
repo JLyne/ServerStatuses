@@ -197,7 +197,7 @@ public class ServerStatuses {
 		}
 	}
 
-	private boolean loadConfig() {
+	private void loadConfig() {
 		// Setup config
 		loadResource("config.yml");
 		loadResource("messages.yml");
@@ -211,51 +211,38 @@ public class ServerStatuses {
 					new File(dataDirectory.toAbsolutePath().toString(), "config.yml")).build().load();
 
 			secret = configuration.getNode("secret").getString();
-			ConfigurationNode toPing = configuration.getNode("servers-to-ping");
-			ConfigurationNode toInform = configuration.getNode("servers-to-inform");
+			ConfigurationNode servers = configuration.getNode("servers");
 
-			if (!toPing.isEmpty()) {
-				if (toPing.isList()) {
-					List<? extends ConfigurationNode> children = toPing.getChildrenList();
+			if (!servers.isEmpty()) {
+				if (servers.isMap()) {
+					Map<Object, ? extends ConfigurationNode> children = servers.getChildrenMap();
 
-					children.forEach((ConfigurationNode child) -> {
-						if (!child.isEmpty() && !child.isMap() && !child.isList()) {
-							String serverName = child.getString(null);
-							Optional<RegisteredServer> server = proxy.getServer(serverName);
+					children.forEach((Object key, ConfigurationNode child) -> {
+						String serverName = key.toString();
+						Optional<RegisteredServer> server = proxy.getServer(serverName);
 
-							if (server.isPresent()) {
-								serversToPing.add(server.get());
-							} else {
-								logger.warn("Ignoring unknown server " + serverName);
-							}
+						if (server.isEmpty()) {
+							logger.warn("Ignoring unknown server " + serverName);
+							return;
+						}
+
+						boolean check = child.getNode("check").getBoolean(false);
+						boolean inform = child.getNode("inform").getBoolean(false);
+
+						if(check) {
+							serversToPing.add(server.get());
+						}
+
+						if(inform) {
+							serversToInform.add(server.get());
 						}
 					});
 				}
 			}
-
-			if (!toInform.isEmpty()) {
-				if (toInform.isList()) {
-					List<? extends ConfigurationNode> children = toInform.getChildrenList();
-
-					children.forEach((ConfigurationNode child) -> {
-						if (!child.isEmpty() && !child.isMap() && !child.isList()) {
-							String serverName = child.getString(null);
-							Optional<RegisteredServer> server = proxy.getServer(serverName);
-
-							if (server.isPresent()) {
-								serversToInform.add(server.get());
-							} else {
-								logger.warn("Ignoring unknown server " + serverName);
-							}
-						}
-					});
-				}
-			}
-
 		} catch (IOException e) {
 			logger.error("Error loading config.yml");
 			e.printStackTrace();
-			return false;
+			return;
 		}
 
 		//Message config
@@ -268,8 +255,6 @@ public class ServerStatuses {
 		} catch (IOException e) {
 			logger.error("Error loading messages.yml");
 		}
-
-		return true;
 	}
 
 	private void loadResource(String resource) {

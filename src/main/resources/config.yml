@@ -1,3 +1,7 @@
 secret: ''
-servers-to-ping: []
-servers-to-inform: []
+servers:
+  example:
+    check: true #Whether to check this server's status
+  example2:
+    check: false
+    inform: true #Whether to send status packets to this server
