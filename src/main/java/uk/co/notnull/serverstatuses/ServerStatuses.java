@@ -2,6 +2,8 @@ package uk.co.notnull.serverstatuses;
 
 import com.google.common.io.ByteStreams;
 import com.google.inject.Inject;
+import com.mattmalec.pterodactyl4j.PteroBuilder;
+import com.mattmalec.pterodactyl4j.client.entities.PteroClient;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyReloadEvent;
@@ -35,6 +37,10 @@ public class ServerStatuses {
 	private StatusInformer statusInformer;
 	private final ConcurrentHashMap<RegisteredServer, StatusChecker> serverCheckers = new ConcurrentHashMap<>();
 
+	private String pterodactylKey = null;
+	private String pterodactylUrl = null;
+	private PteroClient pterodactylClient = null;
+
 	private boolean proxyQueuesEnabled = false;
 	private ProxyQueuesHandler proxyQueuesHandler;
 
@@ -51,11 +57,11 @@ public class ServerStatuses {
 		Optional<PluginContainer> proxyQueues = proxy.getPluginManager().getPlugin("proxyqueues");
 		proxyQueuesEnabled = proxyQueues.isPresent();
 
-		loadConfig();
-
 		if (proxyQueuesEnabled) {
 			this.proxyQueuesHandler = new ProxyQueuesHandler(this, proxyQueues.get());
 		}
+
+		loadConfig();
 	}
 
 	@Subscribe
@@ -68,6 +74,7 @@ public class ServerStatuses {
 		loadResource("config.yml");
 		loadResource("messages.yml");
 
+
 		List<RegisteredServer> serversToInform = new ArrayList<>();
 		serverCheckers.values().forEach(StatusChecker::destroy);
 		serverCheckers.clear();
@@ -75,6 +82,14 @@ public class ServerStatuses {
 		try {
 			ConfigurationNode configuration = YAMLConfigurationLoader.builder().setFile(
 					new File(dataDirectory.toAbsolutePath().toString(), "config.yml")).build().load();
+
+			String pterodactylUrl = configuration.getNode("pterodactyl", "api-url").getString(null);
+			String pterodactylKey = configuration.getNode("pterodactyl", "api-key").getString(null);
+
+			if(pterodactylUrl != null && pterodactylKey != null) {
+				logger.info("Using pterodactyl");
+				pterodactylClient = PteroBuilder.createClient(pterodactylUrl, pterodactylKey);
+			}
 
 			String secret = configuration.getNode("secret").getString();
 
@@ -99,7 +114,8 @@ public class ServerStatuses {
 
 					if(check) {
 						logger.warn("Adding status checker for " + serverName);
-						serverCheckers.computeIfAbsent(server.get(), (k) -> new StatusChecker(server.get(), this));
+						serverCheckers.computeIfAbsent(server.get(), (k) ->
+								new StatusChecker(server.get(), child, pterodactylClient, this));
 					}
 
 					if(inform) {

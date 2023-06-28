@@ -36,8 +36,6 @@ public class StatusInformer {
 
 	@Subscribe
 	public void onServerStatusChange(ServerStatusChangeEvent event) {
-		plugin.getLogger().info("ServerStatusChangeEvent");
-		plugin.getLogger().info(event.getStatus().toString());
 		serverStatuses.compute(event.getServer().getServerInfo().getName(), (k, v) -> event.getStatus());
 		sendStatusPacket();
 	}

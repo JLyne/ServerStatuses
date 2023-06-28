@@ -2,6 +2,7 @@ import org.apache.tools.ant.filters.ReplaceTokens
 
 plugins {
     id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 repositories {
@@ -9,9 +10,11 @@ repositories {
     mavenCentral()
     maven { url "https://repo.not-null.co.uk/releases/" }
     maven { url "https://papermc.io/repo/repository/maven-public/" }
+    maven { url 'https://repo.mattmalec.com/repository/releases'}
 }
 
 dependencies {
+    implementation 'com.mattmalec:Pterodactyl4J:2.BETA_140'
     compileOnly 'com.velocitypowered:velocity-api:3.2.0-SNAPSHOT'
     compileOnly 'uk.co.notnull:ProxyQueuesAPI:1.4'
 
@@ -41,5 +44,14 @@ tasks {
     compileJava {
         options.compilerArgs += ["-Xlint:all", "-Xlint:-processing"]
         options.encoding = 'UTF-8'
+    }
+
+    build {
+        dependsOn(shadowJar)
+    }
+
+    shadowJar {
+        archiveClassifier.set('')
+        relocate 'cloud.commandframework', 'uk.co.notnull.proxydiscord.shaded.cloud'
     }
 }

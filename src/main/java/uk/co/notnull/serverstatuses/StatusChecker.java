@@ -1,37 +1,67 @@
 package uk.co.notnull.serverstatuses;
 
+import com.mattmalec.pterodactyl4j.client.entities.ClientServer;
+import com.mattmalec.pterodactyl4j.client.entities.PteroClient;
+import com.mattmalec.pterodactyl4j.client.managers.WebSocketManager;
+import com.mattmalec.pterodactyl4j.client.ws.events.AuthSuccessEvent;
+import com.mattmalec.pterodactyl4j.client.ws.events.StatsUpdateEvent;
+import com.mattmalec.pterodactyl4j.client.ws.events.StatusUpdateEvent;
+import com.mattmalec.pterodactyl4j.client.ws.events.connection.FailureEvent;
+import com.mattmalec.pterodactyl4j.client.ws.events.token.TokenExpiredEvent;
+import com.mattmalec.pterodactyl4j.client.ws.events.token.TokenExpiringEvent;
+import com.mattmalec.pterodactyl4j.client.ws.hooks.ClientSocketListenerAdapter;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import com.velocitypowered.api.proxy.server.ServerPing;
 import com.velocitypowered.api.scheduler.ScheduledTask;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import ninja.leaping.configurate.ConfigurationNode;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
-public class StatusChecker {
+public class StatusChecker extends ClientSocketListenerAdapter {
+
+	private static final MiniMessage miniMessage = MiniMessage.miniMessage();
 	private static final TextReplacementConfig newlineRemoval = TextReplacementConfig.builder()
 			.match("\n").replacement("").build();
-	private final RegisteredServer server;
 
 	private final ProxyQueuesHandler proxyQueuesHandler;
+	private final ServerStatuses plugin;
 	private final ProxyServer proxy;
 	private final Logger logger;
+	private final PteroClient pteroClient;
 
+	private final RegisteredServer server;
+	private Component staticMotd = null;
+	private String pterodactylServerId = null;
+	private WebSocketManager websocket = null;
+	private final AtomicBoolean websocketConnected = new AtomicBoolean(false);
+	private ScheduledTask reconnectTask = null;
+	private final AtomicInteger reconnectBackoff = new AtomicInteger(1);
+
+	private final ReentrantLock lock = new ReentrantLock();
 	private final ScheduledTask pingTask;
-	private ServerStatus lastStatus = null;
-
 	private final AtomicBoolean pinging = new AtomicBoolean(false);
 	private final AtomicInteger failedPings = new AtomicInteger(0);
+	private @NotNull ServerStatus lastStatus = ServerStatus.builder().build();
 
 
-	public StatusChecker(RegisteredServer server, ServerStatuses plugin) {
+	public StatusChecker(RegisteredServer server, ConfigurationNode config, PteroClient pteroClient, ServerStatuses plugin) {
 		this.server = server;
+		this.plugin = plugin;
 		this.logger = plugin.getLogger();
 		this.proxy = plugin.getProxy();
+		this.pteroClient = pteroClient;
 		this.proxyQueuesHandler = plugin.getProxyQueuesHandler();
+
+		loadConfig(config);
 
 		pingTask = plugin.getProxy().getScheduler()
 				.buildTask(plugin, () -> this.pingServer(server)).repeat(3, TimeUnit.SECONDS).schedule();
@@ -39,12 +69,94 @@ public class StatusChecker {
 
 	public void destroy() {
 		pingTask.cancel();
+		disconnectWebsocket();
 		pinging.set(false);
+	}
+
+	private void loadConfig(ConfigurationNode config) {
+		String motd = config.getNode("motd").getString(null);
+		String serverId = config.getNode("pterodactyl-id").getString(null);
+		staticMotd = motd != null ? miniMessage.deserialize(motd) : null;
+
+		if(serverId == null) {
+			disconnectWebsocket();
+			pterodactylServerId = null;
+
+			return;
+		}
+
+		if(!serverId.equals(pterodactylServerId)) {
+			disconnectWebsocket();
+			pterodactylServerId = serverId;
+			connectWebsocket();
+		}
+	}
+
+	private void connectWebsocket() {
+		pteroClient.retrieveServerByIdentifier(pterodactylServerId).map(ClientServer::getWebSocketBuilder)
+               .map(builder -> builder.addEventListeners(this)).executeAsync((builder) -> websocket = builder.build());
+	}
+	private void disconnectWebsocket() {
+		if(reconnectTask != null) {
+			reconnectTask.cancel();
+		}
+
+		if(websocket != null) {
+			try {
+				websocket.shutdown();
+			} catch (Exception ignored) {
+			} finally {
+				websocket = null;
+			}
+		}
+
+		websocketConnected.set(false);
+	}
+
+	@Override
+    public void onAuthSuccess(AuthSuccessEvent event) {
+		websocketConnected.set(true);
+		reconnectBackoff.set(2);
+
+    }
+
+	@Override
+	public void onStatusUpdate(StatusUpdateEvent event) {
+		logger.info("StatusUpdateEvent");
+		Status status = Status.fromUtilizationState(event.getState());
+
+		lock.lock();
+		try {
+			fireChangeEvent(lastStatus.toBuilder().status(status).build());
+		} finally {
+			lock.unlock();
+		}
+	}
+
+	@Override
+	public void onTokenExpiring(TokenExpiringEvent event) {
+		logger.warn("Token for pterodactyl websocket connection {} expires soon", server.getServerInfo().getName());
+	}
+
+	@Override
+	public void onTokenExpired(TokenExpiredEvent event) {
+		logger.warn("Token for pterodactyl websocket connection {} has expired", server.getServerInfo().getName());
+	}
+
+	@Override
+	public void onFailure(FailureEvent event) {
+		websocketConnected.set(false);
+		logger.warn("Pterodactyl websocket connection for {} failed. Reconnecting in {} seconds...", server.getServerInfo().getName(), reconnectBackoff.get());
+		event.getThrowable().printStackTrace();
+
+		int backoffTime = reconnectBackoff.getAndUpdate(x -> Math.min(2 * x, 60));
+		reconnectTask = proxy.getScheduler()
+				.buildTask(plugin, () -> event.getWebSocketManager().reconnect())
+				.delay(backoffTime, TimeUnit.SECONDS).schedule();
 	}
 
 	private void pingServer(RegisteredServer server) {
 		if(!pinging.get()) {
-			logger.info("Here");
 			pinging.set(true);
 			server.ping().exceptionally((e) -> {
 				logger.warn("Pinging failed for " + server.getServerInfo().getName() + ": " + e.getMessage());
@@ -58,7 +170,6 @@ public class StatusChecker {
 
 	private void handlePingResponse(ServerPing response) {
 		ServerStatus status;
-		AtomicBoolean changed = new AtomicBoolean(false);
 		int failed = 0;
 
 		if(!pinging.get()) {
@@ -67,37 +178,49 @@ public class StatusChecker {
 
 		int queuedPlayers = proxyQueuesHandler != null ? proxyQueuesHandler.getQueuedPlayers(server) : 0;
 
-		if (response == null) {
-			status = ServerStatus.builder().queued(queuedPlayers).build();
-		} else {
-			status = ServerStatus.builder()
-					.status(Status.ONLINE)
-					.players(response.getPlayers().map(ServerPing.Players::getOnline).orElse(0))
-					.queued(queuedPlayers)
-					.motd(response.getDescriptionComponent().replaceText(newlineRemoval))
-					.build();
-		}
+		lock.lock();
+		try {
+			ServerStatus.Builder builder = lastStatus.toBuilder().queued(queuedPlayers).motd(staticMotd);
 
-		changed.set(!status.equals(lastStatus));
+			if (response == null) {
+				failed = failedPings.incrementAndGet();
+				builder.players(0);
 
-		if(status.isOnline()) {
-			failedPings.set(0);
-		} else {
-			failed = failedPings.incrementAndGet();
-		}
+				if(!websocketConnected.get()) {
+					builder.status(Status.OFFLINE);
+				}
+			} else {
+				failedPings.set(0);
+				builder.players(response.getPlayers().map(ServerPing.Players::getOnline).orElse(0))
+						.motd(staticMotd != null
+									  ? staticMotd : response.getDescriptionComponent().replaceText(newlineRemoval));
 
-		if (changed.get()) {
-			proxy.getEventManager().fireAndForget(new ServerStatusChangeEvent(server, status, lastStatus));
-			lastStatus = status;
+				if(!websocketConnected.get()) {
+					builder.status(Status.ONLINE);
+				}
+			}
+
+			status = builder.build();
+
+			if (!status.equals(lastStatus)) {
+				fireChangeEvent(status);
+			}
+		} finally {
+			lock.unlock();
 		}
 
 		// Pause a server's queue if it receives 3 failed pings in a row
-		if(proxyQueuesHandler != null) {
+		if(proxyQueuesHandler != null && !websocketConnected.get()) {
 			if(!proxyQueuesHandler.hasPause(server) && failed >= 3) {
 				proxyQueuesHandler.pause(server);
 			} else if(failed == 0) {
 				proxyQueuesHandler.unpause(server);
 			}
 		}
+	}
+
+	private void fireChangeEvent(ServerStatus newStatus) {
+		proxy.getEventManager().fireAndForget(new ServerStatusChangeEvent(server, newStatus, lastStatus));
+		lastStatus = newStatus;
 	}
 }
