@@ -1,44 +1,29 @@
 package uk.co.notnull.serverstatuses;
 
 import com.google.common.io.ByteStreams;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.inject.Inject;
-import com.velocitypowered.api.event.player.ServerPostConnectEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyReloadEvent;
 import com.velocitypowered.api.plugin.PluginContainer;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
-import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
-import com.velocitypowered.api.proxy.ServerConnection;
-import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
-import com.velocitypowered.api.proxy.server.ServerPing;
-import net.kyori.adventure.text.TextReplacementConfig;
 import ninja.leaping.configurate.ConfigurationNode;
 import ninja.leaping.configurate.yaml.YAMLConfigurationLoader;
 import org.slf4j.Logger;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class ServerStatuses {
@@ -47,28 +32,18 @@ public class ServerStatuses {
 	private final Logger logger;
 	private final Path dataDirectory;
 
-	private final ConcurrentHashMap.KeySetView<RegisteredServer, Boolean> ongoingPings = ConcurrentHashMap.newKeySet();
-	private final ConcurrentHashMap<String, ServerStatus> serverStatuses = new ConcurrentHashMap<>();
-	private final ConcurrentHashMap<String, Integer> failedPings = new ConcurrentHashMap<>();
-	private final TextReplacementConfig newlineRemoval = TextReplacementConfig.builder()
-			.match("\n").replacement("").build();
+	private StatusInformer statusInformer;
+	private final ConcurrentHashMap<RegisteredServer, StatusChecker> serverCheckers = new ConcurrentHashMap<>();
 
 	private boolean proxyQueuesEnabled = false;
 	private ProxyQueuesHandler proxyQueuesHandler;
 
-	private String secret;
-	private final List<RegisteredServer> serversToPing = new ArrayList<>();
-	private final List<RegisteredServer> serversToInform = new ArrayList<>();
-	private final MinecraftChannelIdentifier statusChannel = MinecraftChannelIdentifier
-			.create("serverstatus", "status");
 
 	@Inject
 	public ServerStatuses(ProxyServer proxy, Logger logger, @DataDirectory Path dataDirectory) {
 		this.proxy = proxy;
 		this.logger = logger;
 		this.dataDirectory = dataDirectory;
-
-		loadConfig();
 	}
 
 	@Subscribe
@@ -76,15 +51,11 @@ public class ServerStatuses {
 		Optional<PluginContainer> proxyQueues = proxy.getPluginManager().getPlugin("proxyqueues");
 		proxyQueuesEnabled = proxyQueues.isPresent();
 
+		loadConfig();
+
 		if (proxyQueuesEnabled) {
 			this.proxyQueuesHandler = new ProxyQueuesHandler(this, proxyQueues.get());
 		}
-
-		proxy.getScheduler().buildTask(this, () -> {
-			for (RegisteredServer server : serversToPing) {
-				this.pingServer(server);
-			}
-		}).repeat(3, TimeUnit.SECONDS).schedule();
 	}
 
 	@Subscribe
@@ -92,152 +63,57 @@ public class ServerStatuses {
 		loadConfig();
 	}
 
-	@Subscribe
-	public void onServerJoined(ServerPostConnectEvent event) {
-		RegisteredServer server = event.getPlayer().getCurrentServer().map(ServerConnection::getServer)
-				.orElse(null);
-
-		if (server != null && serversToInform.contains(server) && server.getPlayersConnected().size() == 1) {
-			sendStatusPacketToServer(server);
-		}
-	}
-
-	private void pingServer(RegisteredServer server) {
-		if(!ongoingPings.contains(server)) {
-			ongoingPings.add(server);
-			server.ping().exceptionally((e) -> {
-				logger.warn("Pinging failed for " + server.getServerInfo().getName() + ": " + e.getMessage());
-				return null;
-			}).whenCompleteAsync((result, exception) -> {
-				handlePingResponse(server, result);
-				ongoingPings.remove(server);
-			});
-		}
-	}
-
-	private void handlePingResponse(RegisteredServer server, ServerPing response) {
-		ServerStatus status;
-		String serverName = server.getServerInfo().getName();
-		AtomicBoolean changed = new AtomicBoolean(false);
-		int failed = 0;
-
-		if (!serversToPing.contains(server)) {
-			return;
-		}
-
-		int queuedPlayers = proxyQueuesEnabled ? proxyQueuesHandler.getQueuedPlayers(server) : 0;
-
-		if (response == null) {
-			status = new ServerStatus(Status.OFFLINE, 0, queuedPlayers);
-		} else {
-			status = new ServerStatus(Status.ONLINE, response.getPlayers().map(ServerPing.Players::getOnline)
-					.orElse(0), queuedPlayers, response.getDescriptionComponent()
-					.replaceText(newlineRemoval));
-		}
-
-		serverStatuses.compute(serverName, (String name, ServerStatus value) -> {
-			changed.set(!status.equals(value));
-			return status;
-		});
-
-		if(status.isOnline()) {
-			failed = failedPings.compute(serverName, (key, value) -> 0);
-		} else {
-			failed = failedPings.compute(serverName, (key, value) -> value == null ? 1 : value + 1);
-		}
-
-		if (changed.get()) {
-			sendStatusPacket();
-		}
-
-		// Pause a server's queue if it receives 3 failed pings in a row
-		if(proxyQueuesEnabled) {
-			if(!proxyQueuesHandler.hasPause(server) && failed >= 3) {
-				proxyQueuesHandler.pause(server);
-			} else if(failed == 0) {
-				proxyQueuesHandler.unpause(server);
-			}
-		}
-	}
-
-	private void sendStatusPacket() {
-		for (RegisteredServer server : serversToInform) {
-			sendStatusPacketToServer(server);
-		}
-	}
-
-	private void sendStatusPacketToServer(RegisteredServer server) {
-		Optional<Player> player = server.getPlayersConnected().stream().findFirst();
-
-		if (player.isPresent() && player.get().getCurrentServer().isPresent()) {
-			ServerConnection connection = player.get().getCurrentServer().get();
-
-			try {
-				final byte[] byteKey = secret.getBytes(StandardCharsets.UTF_8);
-				Gson gson = new GsonBuilder().create();
-				Mac hmac = Mac.getInstance("HmacSHA512");
-
-				SecretKeySpec keySpec = new SecretKeySpec(byteKey, "HmacSHA512");
-				hmac.init(keySpec);
-
-				String statusJson = gson.toJson(serverStatuses);
-
-				byte[] macData = hmac.doFinal(statusJson.getBytes(StandardCharsets.UTF_8));
-
-				Map<String, Object> payload = Map.of(
-						"hmac", byteArrayToHex(macData),
-						"servers", statusJson
-				);
-
-				connection.sendPluginMessage(statusChannel, gson.toJson(payload).getBytes());
-			} catch (NoSuchAlgorithmException | InvalidKeyException e) {
-				logger.error("Failed to generate status packet for " + server.getServerInfo().getName());
-				e.printStackTrace();
-			}
-		}
-	}
-
 	private void loadConfig() {
 		// Setup config
 		loadResource("config.yml");
 		loadResource("messages.yml");
 
-		serversToInform.clear();
-		serversToPing.clear();
-		serverStatuses.clear();
+		List<RegisteredServer> serversToInform = new ArrayList<>();
+		serverCheckers.values().forEach(StatusChecker::destroy);
+		serverCheckers.clear();
 
 		try {
 			ConfigurationNode configuration = YAMLConfigurationLoader.builder().setFile(
 					new File(dataDirectory.toAbsolutePath().toString(), "config.yml")).build().load();
 
-			secret = configuration.getNode("secret").getString();
+			String secret = configuration.getNode("secret").getString();
+
+			if(secret == null) {
+				logger.warn("No secret provided, server status packets will not be sent");
+			}
+
 			ConfigurationNode servers = configuration.getNode("servers");
 
-			if (!servers.isEmpty()) {
-				if (servers.isMap()) {
-					Map<Object, ? extends ConfigurationNode> children = servers.getChildrenMap();
+			if (!servers.isVirtual() && servers.isMap()) {
+				Map<Object, ? extends ConfigurationNode> children = servers.getChildrenMap();
+				children.forEach((Object key, ConfigurationNode child) -> {
+					String serverName = key.toString();
+					Optional<RegisteredServer> server = proxy.getServer(serverName);
+					if (server.isEmpty()) {
+						logger.warn("Ignoring unknown server " + serverName);
+						return;
+					}
 
-					children.forEach((Object key, ConfigurationNode child) -> {
-						String serverName = key.toString();
-						Optional<RegisteredServer> server = proxy.getServer(serverName);
+					boolean check = child.getNode("check").getBoolean(false);
+					boolean inform = child.getNode("inform").getBoolean(false);
 
-						if (server.isEmpty()) {
-							logger.warn("Ignoring unknown server " + serverName);
-							return;
-						}
+					if(check) {
+						logger.warn("Adding status checker for " + serverName);
+						serverCheckers.computeIfAbsent(server.get(), (k) -> new StatusChecker(server.get(), this));
+					}
 
-						boolean check = child.getNode("check").getBoolean(false);
-						boolean inform = child.getNode("inform").getBoolean(false);
+					if(inform) {
+						logger.warn("Adding status informer for " + serverName);
+						serversToInform.add(server.get());
+					}
+				});
+			}
 
-						if(check) {
-							serversToPing.add(server.get());
-						}
-
-						if(inform) {
-							serversToInform.add(server.get());
-						}
-					});
-				}
+			if(statusInformer == null) {
+				statusInformer = new StatusInformer(this, secret, serversToInform);
+			} else {
+				statusInformer.setSecret(secret);
+				statusInformer.setServersToInform(serversToInform);
 			}
 		} catch (IOException e) {
 			logger.error("Error loading config.yml");
@@ -280,10 +156,19 @@ public class ServerStatuses {
 		}
 	}
 
-	private static String byteArrayToHex(byte[] a) {
-		StringBuilder sb = new StringBuilder(a.length * 2);
-		for (byte b : a)
-			sb.append(String.format("%02x", b));
-		return sb.toString();
+	ProxyServer getProxy() {
+		return proxy;
+	}
+
+	Logger getLogger() {
+		return logger;
+	}
+
+	boolean isProxyQueuesEnabled() {
+		return proxyQueuesEnabled;
+	}
+
+	ProxyQueuesHandler getProxyQueuesHandler() {
+		return proxyQueuesHandler;
 	}
 }

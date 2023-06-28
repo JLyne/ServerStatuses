@@ -23,14 +23,6 @@ public class ServerStatus {
 
 	private transient final Component motd;
 
-	public ServerStatus(Status status, int playersOnline, int playersQueued) {
-		this(status, playersOnline, playersQueued, null, null);
-	}
-
-	public ServerStatus(Status status, int playersOnline, int playersQueued, Component motd) {
-		this(status, playersOnline, playersQueued, motd, null);
-	}
-
 	public ServerStatus(Status status, int playersOnline, int playersQueued, Component motd, String lockdownReason) {
 		this.status = status;
 		this.playersOnline = playersOnline;
@@ -128,5 +120,68 @@ public class ServerStatus {
 				", playersQueued=" + playersQueued +
 				", motd=" + motd +
 				'}';
+	}
+
+	public Builder toBuilder() {
+		return builder().status(status).players(playersOnline).queued(playersQueued).motd(motd).lockdown(lockdownReason);
+	}
+
+	public static Builder builder() {
+		return new Builder();
+	}
+
+	public static class Builder {
+		private Status status = Status.OFFLINE;
+
+		private int playersOnline = 0;
+
+		private int playersQueued = 0;
+
+		private Component motd = null;
+
+		private String lockdownReason;
+
+		public Builder() {
+
+		}
+
+		public Builder status(Status status) {
+			Objects.requireNonNull(status);
+			this.status = status;
+
+			return this;
+		}
+
+		public Builder players(int online) {
+			this.playersOnline = online;
+
+			return this;
+		}
+
+		public Builder queued(int queued) {
+			this.playersQueued = queued;
+
+			return this;
+		}
+
+		public Builder motd(Component motd) {
+			this.motd = motd;
+
+			return this;
+		}
+
+		public Builder lockdown(String reason) {
+			if(reason != null) {
+				this.status = Status.LOCKDOWN;
+			}
+
+			this.lockdownReason = reason;
+
+			return this;
+		}
+
+		public ServerStatus build() {
+			return new ServerStatus(status, playersOnline, playersQueued, motd, lockdownReason);
+		}
 	}
 }
