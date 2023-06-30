@@ -21,6 +21,8 @@ import com.velocitypowered.api.proxy.server.RegisteredServer;
 import ninja.leaping.configurate.ConfigurationNode;
 import ninja.leaping.configurate.yaml.YAMLConfigurationLoader;
 import org.slf4j.Logger;
+import uk.co.notnull.messageshelper.Message;
+import uk.co.notnull.messageshelper.MessagesHelper;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -48,7 +50,8 @@ public class ServerStatuses {
 	private String pterodactylUrl = null;
 	private PteroClient pterodactylClient = null;
 
-	private boolean proxyQueuesEnabled = false;
+	private static final MessagesHelper messagesHelper = MessagesHelper.getInstance();
+
 	private ProxyQueuesHandler proxyQueuesHandler;
 
 
@@ -89,7 +92,7 @@ public class ServerStatuses {
             .requires(source -> source.hasPermission("serverstatuses.reload"))
             .executes(context -> {
                 loadConfig();
-				context.getSource().sendMessage(Messages.getComponent("reloaded"));
+				messagesHelper.send(context.getSource(), Message.builder("reloaded").build());
 				return Command.SINGLE_SUCCESS;
             }).build();
 
@@ -106,6 +109,12 @@ public class ServerStatuses {
 		List<RegisteredServer> serversToInform = new ArrayList<>();
 		serverCheckers.values().forEach(StatusChecker::destroy);
 		serverCheckers.clear();
+
+		try {
+			messagesHelper.loadMessages(new File(dataDirectory.toAbsolutePath().toString(), "messages.yml"));
+		} catch (IOException e) {
+			logger.error("Error loading messages.yml");
+		}
 
 		try {
 			ConfigurationNode configuration = YAMLConfigurationLoader.builder().setFile(
@@ -164,17 +173,6 @@ public class ServerStatuses {
 			e.printStackTrace();
 			return;
 		}
-
-		//Message config
-        ConfigurationNode messagesConfiguration;
-
-        try {
-			messagesConfiguration = YAMLConfigurationLoader.builder().setFile(
-					new File(dataDirectory.toAbsolutePath().toString(), "messages.yml")).build().load();
-		    Messages.set(messagesConfiguration);
-		} catch (IOException e) {
-			logger.error("Error loading messages.yml");
-		}
 	}
 
 	private void loadResource(String resource) {
@@ -198,6 +196,10 @@ public class ServerStatuses {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	static MessagesHelper getMessagesHelper() {
+		return messagesHelper;
 	}
 
 	ProxyServer getProxy() {

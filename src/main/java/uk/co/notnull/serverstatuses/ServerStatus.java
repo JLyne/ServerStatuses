@@ -3,6 +3,8 @@ package uk.co.notnull.serverstatuses;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
+import uk.co.notnull.messageshelper.Message;
+import uk.co.notnull.messageshelper.MessagesHelper;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,15 +38,17 @@ public class ServerStatus {
 	private void prepareComponents() {
 		Map<String, String> placeholders = new HashMap<>();
 		List<String> playerStatus = new ArrayList<>();
-		Map<String, ComponentLike> componentPlaceholders = motd != null ?
-				Collections.singletonMap("motd",motd) : Collections.emptyMap();
+		Map<String, ComponentLike> componentPlaceholders = Collections.singletonMap(
+				"motd", motd != null ? motd : Component.empty());
+
+		MessagesHelper helper = ServerStatuses.getMessagesHelper();
 
 		if (status.isOnline()) {
-			playerStatus.add(Messages.get("players.online"));
+			playerStatus.add(helper.getString("players.online"));
 		}
 
 		if (playersQueued > 0 || !status.isOnline()) {
-			playerStatus.add(Messages.get("players.queued"));
+			playerStatus.add(helper.getString("players.queued"));
 		}
 
 		placeholders.put("players", String.join(", ", playerStatus));
@@ -56,8 +60,13 @@ public class ServerStatus {
 		}
 
 		String messageKey = status.getMessageKey();
-		Component line1 = Messages.getComponent(messageKey + ".line-1", placeholders, componentPlaceholders);
-		Component line2 = Messages.getComponent(messageKey + ".line-2", placeholders, componentPlaceholders);
+		Component line1 = helper.getComponent(Message.builder(String.format("%s.line-1", messageKey))
+													  .stringReplacements(placeholders)
+													  .componentReplacements(componentPlaceholders)
+													  .build());
+		Component line2 = helper.getComponent(Message.builder(String.format("%s.line-2", messageKey))
+													  .stringReplacements(placeholders)
+													  .componentReplacements(componentPlaceholders).build());
 
 		separateLines[0] = gsonComponentSerializer.serialize(line1);
 		separateLines[1] = gsonComponentSerializer.serialize(line2);
