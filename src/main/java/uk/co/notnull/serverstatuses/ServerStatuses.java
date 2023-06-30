@@ -38,16 +38,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 public class ServerStatuses {
-
 	private final ProxyServer proxy;
 	private final Logger logger;
 	private final Path dataDirectory;
 
 	private StatusInformer statusInformer;
 	private final ConcurrentHashMap<RegisteredServer, StatusChecker> serverCheckers = new ConcurrentHashMap<>();
-
-	private String pterodactylKey = null;
-	private String pterodactylUrl = null;
 	private PteroClient pterodactylClient = null;
 
 	private static final MessagesHelper messagesHelper = MessagesHelper.getInstance();
@@ -65,7 +61,7 @@ public class ServerStatuses {
 	@Subscribe
 	public void onProxyInitialization(ProxyInitializeEvent event) {
 		Optional<PluginContainer> proxyQueues = proxy.getPluginManager().getPlugin("proxyqueues");
-		proxyQueuesEnabled = proxyQueues.isPresent();
+		boolean proxyQueuesEnabled = proxyQueues.isPresent();
 
 		if (proxyQueuesEnabled) {
 			this.proxyQueuesHandler = new ProxyQueuesHandler(this, proxyQueues.get());
@@ -208,10 +204,6 @@ public class ServerStatuses {
 
 	Logger getLogger() {
 		return logger;
-	}
-
-	boolean isProxyQueuesEnabled() {
-		return proxyQueuesEnabled;
 	}
 
 	ProxyQueuesHandler getProxyQueuesHandler() {
