@@ -19,6 +19,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import ninja.leaping.configurate.ConfigurationNode;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
+import uk.co.notnull.serverstatuses.events.ServerStatusChangeEvent;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;

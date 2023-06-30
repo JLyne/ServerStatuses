@@ -1,7 +1,8 @@
-package uk.co.notnull.serverstatuses;
+package uk.co.notnull.serverstatuses.events;
 
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import org.jetbrains.annotations.Nullable;
+import uk.co.notnull.serverstatuses.ServerStatus;
 
 public class ServerStatusChangeEvent {
 	private final RegisteredServer server;

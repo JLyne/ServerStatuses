@@ -8,6 +8,7 @@ import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
+import uk.co.notnull.serverstatuses.events.ServerStatusChangeEvent;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
