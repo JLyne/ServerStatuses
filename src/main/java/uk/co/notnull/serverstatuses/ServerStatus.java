@@ -103,7 +103,8 @@ public class ServerStatus {
 		if (this == o) return true;
 		if (o == null || getClass() != o.getClass()) return false;
 		ServerStatus that = (ServerStatus) o;
-		return isOnline() == that.isOnline() && getPlayersOnline() == that.getPlayersOnline() && getPlayersQueued() == that.getPlayersQueued() && Objects.equals(
+		return getStatus().equals(
+				that.getStatus()) && getPlayersOnline() == that.getPlayersOnline() && getPlayersQueued() == that.getPlayersQueued() && Objects.equals(
 				getMotd(), that.getMotd());
 	}
 
