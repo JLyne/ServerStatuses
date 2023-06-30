@@ -1,19 +1,19 @@
 statuses:
   offline:
-    line-1: "<red>⚪ OFFLINE<reset> - 👥 <players>"
+    line-1: "<red>⚪ OFFLINE<reset>  👥 <players>"
     line-2: ""
   online:
-    line-1: "<green>⚪ ONLINE<reset> - 👥 <players>"
+    line-1: "<green>⚪ ONLINE<reset>  👥 <players>"
     line-2: "📣 <motd>"
   starting:
-    line-1: "⏳ <yellow>STARTING...<reset> - 👥 <players>"
+    line-1: "⏳ <yellow>STARTING...<reset>  👥 <players>"
     line-2: "ℹ️ <grey>Server is starting..."
   stopping:
-    line-1: "⏳ <yellow>STOPPING...<reset> - 👥 <players>"
+    line-1: "⏳ <yellow>STOPPING...<reset>  👥 <players>"
     line-2: "ℹ️ <grey>Server is shutting down..."
   lockdown:
-    line-1: "<red>LOCKDOWN<reset> - <players>"
-    line-2: "<lockdownreason>"
+    line-1: "<orange>LOCKDOWN<reset>  👥 <players>"
+    line-2: "ℹ️ <lockdownreason>"
 players:
   online: "<online> playing"
   queued: "<queued> queued"
