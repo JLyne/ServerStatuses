@@ -4,7 +4,6 @@ import com.mattmalec.pterodactyl4j.client.entities.ClientServer;
 import com.mattmalec.pterodactyl4j.client.entities.PteroClient;
 import com.mattmalec.pterodactyl4j.client.managers.WebSocketManager;
 import com.mattmalec.pterodactyl4j.client.ws.events.AuthSuccessEvent;
-import com.mattmalec.pterodactyl4j.client.ws.events.StatsUpdateEvent;
 import com.mattmalec.pterodactyl4j.client.ws.events.StatusUpdateEvent;
 import com.mattmalec.pterodactyl4j.client.ws.events.connection.FailureEvent;
 import com.mattmalec.pterodactyl4j.client.ws.events.token.TokenExpiredEvent;
@@ -122,12 +121,19 @@ public class StatusChecker extends ClientSocketListenerAdapter {
 
 	@Override
 	public void onStatusUpdate(StatusUpdateEvent event) {
-		logger.info("StatusUpdateEvent");
-		Status status = Status.fromUtilizationState(event.getState());
-
 		lock.lock();
+
 		try {
+			Status status = Status.fromUtilizationState(event.getState());
 			fireChangeEvent(lastStatus.toBuilder().status(status).build());
+
+			if(proxyQueuesHandler != null) {
+				if(!proxyQueuesHandler.hasPause(server) && !status.isOnline()) {
+					proxyQueuesHandler.pause(server);
+				} else if(status.isOnline()) {
+					proxyQueuesHandler.unpause(server);
+				}
+			}
 		} finally {
 			lock.unlock();
 		}
