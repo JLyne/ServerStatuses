@@ -4,6 +4,13 @@ import com.google.common.io.ByteStreams;
 import com.google.inject.Inject;
 import com.mattmalec.pterodactyl4j.PteroBuilder;
 import com.mattmalec.pterodactyl4j.client.entities.PteroClient;
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.velocitypowered.api.command.BrigadierCommand;
+import com.velocitypowered.api.command.CommandManager;
+import com.velocitypowered.api.command.CommandMeta;
+import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyReloadEvent;
@@ -61,12 +68,33 @@ public class ServerStatuses {
 			this.proxyQueuesHandler = new ProxyQueuesHandler(this, proxyQueues.get());
 		}
 
+		initCommand();
 		loadConfig();
 	}
 
 	@Subscribe
 	public void onProxyReload(ProxyReloadEvent event) {
 		loadConfig();
+	}
+
+	private void initCommand() {
+		CommandManager commandManager = getProxy().getCommandManager();
+
+        CommandMeta reloadMeta = commandManager.metaBuilder("ssreload")
+            .plugin(this)
+            .build();
+
+		LiteralCommandNode<CommandSource> reloadNode = LiteralArgumentBuilder
+            .<CommandSource>literal("ssreload")
+            .requires(source -> source.hasPermission("serverstatuses.reload"))
+            .executes(context -> {
+                loadConfig();
+				context.getSource().sendMessage(Messages.getComponent("reloaded"));
+				return Command.SINGLE_SUCCESS;
+            }).build();
+
+        // BrigadierCommand implements Command
+        commandManager.register(reloadMeta, new BrigadierCommand(reloadNode));
 	}
 
 	private void loadConfig() {

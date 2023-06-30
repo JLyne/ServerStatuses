@@ -17,3 +17,4 @@ statuses:
 players:
   online: "<online> playing"
   queued: "<queued> queued"
+reloaded: '<green>ServerStatuses has been reloaded'

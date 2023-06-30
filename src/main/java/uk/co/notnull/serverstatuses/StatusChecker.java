@@ -75,19 +75,10 @@ public class StatusChecker extends ClientSocketListenerAdapter {
 
 	private void loadConfig(ConfigurationNode config) {
 		String motd = config.getNode("motd").getString(null);
-		String serverId = config.getNode("pterodactyl-id").getString(null);
+		pterodactylServerId = config.getNode("pterodactyl-id").getString(null);
 		staticMotd = motd != null ? miniMessage.deserialize(motd) : null;
 
-		if(serverId == null) {
-			disconnectWebsocket();
-			pterodactylServerId = null;
-
-			return;
-		}
-
-		if(!serverId.equals(pterodactylServerId)) {
-			disconnectWebsocket();
-			pterodactylServerId = serverId;
+		if(pterodactylServerId != null) {
 			connectWebsocket();
 		}
 	}
@@ -116,8 +107,7 @@ public class StatusChecker extends ClientSocketListenerAdapter {
 	@Override
     public void onAuthSuccess(AuthSuccessEvent event) {
 		websocketConnected.set(true);
-		reconnectBackoff.set(2);
-
+		reconnectBackoff.set(1);
     }
 
 	@Override
