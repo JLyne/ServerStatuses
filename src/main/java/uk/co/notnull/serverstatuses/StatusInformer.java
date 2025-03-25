@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class StatusInformer {
+public final class StatusInformer {
 	private static final MinecraftChannelIdentifier statusChannel = MinecraftChannelIdentifier
 			.create("serverstatus", "status");
 	private final ServerStatuses plugin;

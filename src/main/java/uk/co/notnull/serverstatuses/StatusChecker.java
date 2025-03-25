@@ -16,7 +16,7 @@ import com.velocitypowered.api.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.minimessage.MiniMessage;
-import ninja.leaping.configurate.ConfigurationNode;
+import org.spongepowered.configurate.ConfigurationNode;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import uk.co.notnull.serverstatuses.events.ServerStatusChangeEvent;
@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class StatusChecker extends ClientSocketListenerAdapter {
+public final class StatusChecker extends ClientSocketListenerAdapter {
 
 	private static final MiniMessage miniMessage = MiniMessage.miniMessage();
 	private static final TextReplacementConfig newlineRemoval = TextReplacementConfig.builder()
@@ -74,8 +74,8 @@ public class StatusChecker extends ClientSocketListenerAdapter {
 	}
 
 	private void loadConfig(ConfigurationNode config) {
-		String motd = config.getNode("motd").getString(null);
-		pterodactylServerId = config.getNode("pterodactyl-id").getString(null);
+		String motd = config.node("motd").getString(null);
+		pterodactylServerId = config.node("pterodactyl-id").getString(null);
 		staticMotd = motd != null ? miniMessage.deserialize(motd) : null;
 
 		if(pterodactylServerId != null) {

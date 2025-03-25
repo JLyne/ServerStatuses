@@ -1,0 +1,15 @@
+[versions]
+velocityApi = "3.4.0-SNAPSHOT"
+shadow = "8.3.6"
+proxyQueuesApi="1.4"
+pterodactyl4J="2.BETA_142"
+messagesHelper="1.0-SNAPSHOT"
+
+[libraries]
+velocityApi = { group = "com.velocitypowered", name = "velocity-api", version.ref="velocityApi" }
+proxyQueuesApi = { group = "uk.co.notnull", name = "ProxyQueuesAPI", version.ref="proxyQueuesApi" }
+pterodactyl4J = { group = "com.mattmalec", name = "Pterodactyl4J", version.ref="pterodactyl4J" }
+messagesHelper = { group = "uk.co.notnull", name = "MessagesHelper-velocity", version.ref="messagesHelper" }
+
+[plugins]
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

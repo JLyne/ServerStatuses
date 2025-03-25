@@ -18,8 +18,8 @@ import com.velocitypowered.api.plugin.PluginContainer;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
-import ninja.leaping.configurate.ConfigurationNode;
-import ninja.leaping.configurate.yaml.YAMLConfigurationLoader;
+import org.spongepowered.configurate.ConfigurationNode;
+import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 import org.slf4j.Logger;
 import uk.co.notnull.messageshelper.Message;
 import uk.co.notnull.messageshelper.MessagesHelper;
@@ -113,27 +113,27 @@ public class ServerStatuses {
 		}
 
 		try {
-			ConfigurationNode configuration = YAMLConfigurationLoader.builder().setFile(
+			ConfigurationNode configuration = YamlConfigurationLoader.builder().file(
 					new File(dataDirectory.toAbsolutePath().toString(), "config.yml")).build().load();
 
-			String pterodactylUrl = configuration.getNode("pterodactyl", "api-url").getString(null);
-			String pterodactylKey = configuration.getNode("pterodactyl", "api-key").getString(null);
+			String pterodactylUrl = configuration.node("pterodactyl", "api-url").getString(null);
+			String pterodactylKey = configuration.node("pterodactyl", "api-key").getString(null);
 
 			if(pterodactylUrl != null && pterodactylKey != null) {
 				logger.info("Using pterodactyl");
 				pterodactylClient = PteroBuilder.createClient(pterodactylUrl, pterodactylKey);
 			}
 
-			String secret = configuration.getNode("secret").getString();
+			String secret = configuration.node("secret").getString();
 
 			if(secret == null) {
 				logger.warn("No secret provided, server status packets will not be sent");
 			}
 
-			ConfigurationNode servers = configuration.getNode("servers");
+			ConfigurationNode servers = configuration.node("servers");
 
-			if (!servers.isVirtual() && servers.isMap()) {
-				Map<Object, ? extends ConfigurationNode> children = servers.getChildrenMap();
+			if (!servers.virtual() && servers.isMap()) {
+				Map<Object, ? extends ConfigurationNode> children = servers.childrenMap();
 				children.forEach((Object key, ConfigurationNode child) -> {
 					String serverName = key.toString();
 					Optional<RegisteredServer> server = proxy.getServer(serverName);
@@ -142,8 +142,8 @@ public class ServerStatuses {
 						return;
 					}
 
-					boolean check = child.getNode("check").getBoolean(false);
-					boolean inform = child.getNode("inform").getBoolean(false);
+					boolean check = child.node("check").getBoolean(false);
+					boolean inform = child.node("inform").getBoolean(false);
 
 					if(check) {
 						logger.warn("Adding status checker for " + serverName);
