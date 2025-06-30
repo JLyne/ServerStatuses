@@ -2,7 +2,7 @@
   "id": "serverstatuses",
   "name": "ServerStatuses",
   "version": "${version}",
-  "authors": ["Jim (NotKatuen)"],
+  "authors": ["Jim (AnEnragedPigeon)"],
   "dependencies": [
     {
       "id": "proxyqueues",
