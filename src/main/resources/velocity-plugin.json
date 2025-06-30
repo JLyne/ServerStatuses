@@ -1,7 +1,7 @@
 {
   "id": "serverstatuses",
   "name": "ServerStatuses",
-  "version": "@project.version@",
+  "version": "${version}",
   "authors": ["Jim (NotKatuen)"],
   "dependencies": [
     {
