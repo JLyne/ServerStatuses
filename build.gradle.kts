@@ -33,7 +33,7 @@ dependencies {
     implementation(libs.messagesHelper)
 
     compileOnly(libs.velocityApi)
-    implementation(libs.proxyQueuesApi)
+    compileOnly(libs.proxyQueuesApi)
 
     annotationProcessor(libs.velocityApi)
 }
