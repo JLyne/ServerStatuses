@@ -116,10 +116,10 @@ public class ServerStatuses {
 			ConfigurationNode configuration = YamlConfigurationLoader.builder().file(
 					new File(dataDirectory.toAbsolutePath().toString(), "config.yml")).build().load();
 
-			String pterodactylUrl = configuration.node("pterodactyl", "api-url").getString(null);
-			String pterodactylKey = configuration.node("pterodactyl", "api-key").getString(null);
+			String pterodactylUrl = configuration.node("pterodactyl", "api-url").getString("");
+			String pterodactylKey = configuration.node("pterodactyl", "api-key").getString("");
 
-			if(pterodactylUrl != null && pterodactylKey != null) {
+			if(!pterodactylUrl.isEmpty() && !pterodactylKey.isEmpty()) {
 				logger.info("Using pterodactyl");
 				pterodactylClient = PteroBuilder.createClient(pterodactylUrl, pterodactylKey);
 			}

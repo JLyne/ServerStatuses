@@ -74,11 +74,11 @@ public final class StatusChecker extends ClientSocketListenerAdapter {
 	}
 
 	private void loadConfig(ConfigurationNode config) {
-		String motd = config.node("motd").getString(null);
-		pterodactylServerId = config.node("pterodactyl-id").getString(null);
-		staticMotd = motd != null ? miniMessage.deserialize(motd) : null;
+		String motd = config.node("motd").getString("");
+		pterodactylServerId = config.node("pterodactyl-id").getString("");
+		staticMotd = motd.isEmpty() ? null : miniMessage.deserialize(motd);
 
-		if(pterodactylServerId != null) {
+		if(!pterodactylServerId.isEmpty()) {
 			connectWebsocket();
 		}
 	}
