@@ -1,6 +1,6 @@
 [versions]
-velocityApi = "4.1.0-SNAPSHOT"
-shadow = "9.6.0"
+velocityApi = "4.1.2-SNAPSHOT"
+shadow = "9.6.1"
 proxyQueuesApi="1.4"
 pterodactyl4J="2.BETA_142"
 messagesHelper="1.0-SNAPSHOT"
